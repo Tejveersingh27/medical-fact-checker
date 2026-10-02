@@ -1,54 +1,65 @@
-from openai import OpenAI # same as import java.util.Scanner;
+"""
+Hantavirus Medical Fact-Checker
 
-from dotenv import load_dotenv  # importing the dotenv library
+Takes a health claim, searches only trusted public-health sources (CDC and WHO)
+with the Tavily API, and asks GPT-4o-mini to return a verdict, explanation,
+and sources based on that evidence.
+"""
 
-from tavily import TavilyClient # importing the tavily library This is used to search the web first before consulting chatGPT
+import os
 
-import os  # built in Python library, like java.io
+from dotenv import load_dotenv
+from openai import OpenAI
+from tavily import TavilyClient
 
-load_dotenv() # reads your .env file, loads the key into memory
+TRUSTED_DOMAINS = ["cdc.gov", "who.int"]
+MODEL = "gpt-4o-mini"
 
-# This is like creating an instance of a class in Java
-# OpenAI() automatically finds your key from .env
-
-
-client = OpenAI() # same as Scanner sc = new Scanner(System.in);
-
-
-# same as OpenAI client — creating an object to talk to Tavily
-tavily = TavilyClient(api_key=os.getenv("TAVILY_API_KEY")) # go find TAVILY_API_KEY from my .env file.
-
-
-claim = input("Enter your claim: ")
-
-# search the web for real information
-search_results = tavily.search(
-    query=claim,
-    search_depth="advanced",
-    include_domains=["cdc.gov", "who.int"] # only trust these sources
+SYSTEM_PROMPT = (
+    "You are a medical fact checker specializing in hantavirus. "
+    "Use ONLY the search results provided to evaluate the claim. "
+    "Respond with: "
+    "1) VERDICT: TRUE / FALSE / MISLEADING "
+    "2) EXPLANATION: why, based on the evidence "
+    "3) SOURCES: cite the CDC or WHO sources from the search results that support your answer. "
+    "If the search results do not contain enough information, say so instead of guessing."
 )
 
-# Step 2 — extract just the text from search results
-# like getting .content from a JSON response
-context = "\n".join([r["content"] for r in search_results["results"]])
 
-# We're sending a message to ChatGPT and getting a response back
-response = client.chat.completions.create(
-    model="gpt-4o-mini",
-    messages=[
-        {
-            "role": "system",
-            "content": "You are a medical fact checker specializing in hantavirus.. When given a claim respond with: 1) VERDICT: TRUE/FALSE/MISLEADING 2) EXPLANATION: why 3) SOURCES: cite CDC, WHO or PubMed sources that support your answer"
-        },
-        {
-            "role": "user", # this means you are actually asking
-            "content": f"Claim: {claim}\n\nReal search results from CDC/WHO:\n{context}" #f claim is pythons version
-            # Claim + {claim} + "\n" + Real search results from CDC/WHO + {context} 
-        }
-    ]
-)
-# Extract the text response
-answer = response.choices[0].message.content # chatGPT gives a big response like JSON
-print("ChatGPT's response:")
-print(answer)
- 
+def search_trusted_sources(tavily: TavilyClient, claim: str) -> str:
+    """Search CDC and WHO for the claim and return the combined result text."""
+    results = tavily.search(
+        query=claim,
+        search_depth="advanced",
+        include_domains=TRUSTED_DOMAINS,
+    )
+    return "\n".join(r["content"] for r in results["results"])
+
+
+def fact_check(client: OpenAI, claim: str, context: str) -> str:
+    """Ask the model to evaluate the claim using only the retrieved context."""
+    response = client.chat.completions.create(
+        model=MODEL,
+        messages=[
+            {"role": "system", "content": SYSTEM_PROMPT},
+            {
+                "role": "user",
+                "content": f"Claim: {claim}\n\nSearch results from CDC/WHO:\n{context}",
+            },
+        ],
+    )
+    return response.choices[0].message.content
+
+
+def main() -> None:
+    load_dotenv()  # loads OPENAI_API_KEY and TAVILY_API_KEY from .env
+    client = OpenAI()
+    tavily = TavilyClient(api_key=os.getenv("TAVILY_API_KEY"))
+
+    claim = input("Enter your claim: ")
+    context = search_trusted_sources(tavily, claim)
+    print(fact_check(client, claim, context))
+
+
+if __name__ == "__main__":
+    main()

@@ -44,8 +44,8 @@ VERDICT (TRUE / FALSE / MISLEADING) · EXPLANATION · SOURCES
 
 ```bash
 # 1. Clone the repo
-git clone https://github.com/Tejveersingh27/hantavirus-agent.git
-cd hantavirus-agent
+git clone https://github.com/Tejveersingh27/medical-fact-checker.git
+cd medical-fact-checker
 
 # 2. Install dependencies
 pip install -r requirements.txt
