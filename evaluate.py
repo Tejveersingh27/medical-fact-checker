@@ -34,6 +34,13 @@ CLAIMS = [
     ("Thousands of people in the US get hantavirus every year.", ["FALSE", "MISLEADING"]),
     ("Hantavirus is not contagious between humans.", ["MISLEADING", "FALSE"]),
     ("Sealing holes in your home to keep rodents out lowers your risk of hantavirus.", ["TRUE"]),
+    # Harder: multi-part, half-true, and off-topic claims
+    ("Hantavirus is spread by rodents and there is a vaccine that prevents it.", ["FALSE", "MISLEADING"]),
+    ("Hantavirus only spreads from rodents, never between people, anywhere in the world.", ["FALSE", "MISLEADING"]),
+    ("Hantavirus is mild and most people recover without hospital care.", ["FALSE", "MISLEADING"]),
+    ("Only people who live in rural areas can get hantavirus.", ["FALSE", "MISLEADING"]),
+    ("Measles spreads through the air.", ["INSUFFICIENT_EVIDENCE"]),
+    ("Drinking bleach cures hantavirus.", ["FALSE"]),
 ]
 
 
