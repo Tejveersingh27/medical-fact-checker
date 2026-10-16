@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hantavirus Fact-Checker</title>
+<style>
+  :root { --bg:#f7f7f5; --fg:#1c1c1a; --muted:#6b6b66; --card:#fff; --line:#e3e3df;
+          --true:#1a7f4b; --false:#c0392b; --mis:#b7791f; --none:#6b6b66; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg:#161615; --fg:#eeeeea; --muted:#9a9a94; --card:#20201e; --line:#333330; }
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--fg);
+         font:16px/1.5 system-ui,-apple-system,sans-serif; }
+  main { max-width:640px; margin:0 auto; padding:48px 16px; }
+  h1 { font-size:1.6rem; margin:0 0 4px; }
+  .sub { color:var(--muted); margin:0 0 24px; }
+  textarea { width:100%; padding:12px; font:inherit; color:inherit; background:var(--card);
+             border:1px solid var(--line); border-radius:8px; resize:vertical; }
+  button { margin-top:12px; padding:10px 20px; font:inherit; font-weight:600; cursor:pointer;
+           background:var(--fg); color:var(--bg); border:0; border-radius:8px; }
+  button:disabled { opacity:.5; cursor:wait; }
+  .card { margin-top:24px; padding:20px; background:var(--card);
+          border:1px solid var(--line); border-radius:12px; }
+  .badge { display:inline-block; padding:4px 12px; border-radius:999px; color:#fff;
+           font-weight:700; font-size:.85rem; letter-spacing:.04em; }
+  .TRUE { background:var(--true); } .FALSE { background:var(--false); }
+  .MISLEADING { background:var(--mis); } .INSUFFICIENT_EVIDENCE { background:var(--none); }
+  h2 { font-size:.8rem; text-transform:uppercase; letter-spacing:.06em; color:var(--muted); margin:20px 0 6px; }
+  ul { margin:0; padding-left:20px; } a { color:inherit; }
+  .note { color:var(--muted); font-size:.85rem; margin-top:32px; }
+  .error { color:var(--false); }
+</style>
+</head>
+<body>
+<main>
+  <h1>Hantavirus Fact-Checker</h1>
+  <p class="sub">Checks a claim against CDC and WHO pages only.</p>
+
+  <form id="form">
+    <textarea id="claim" rows="3" maxlength="500" required
+      placeholder="e.g. Hantavirus spreads easily from person to person."></textarea>
+    <button id="btn" type="submit">Check claim</button>
+  </form>
+
+  <div id="out"></div>
+
+  <p class="note">Learning prototype. Not medical advice.</p>
+</main>
+
+<script>
+const form = document.getElementById("form");
+const btn = document.getElementById("btn");
+const out = document.getElementById("out");
+
+// Build the result with textContent (not innerHTML) so model output can't inject HTML.
+function el(tag, text, cls) {
+  const e = document.createElement(tag);
+  if (text) e.textContent = text;
+  if (cls) e.className = cls;
+  return e;
+}
+
+form.addEventListener("submit", async (ev) => {
+  ev.preventDefault();
+  btn.disabled = true;
+  btn.textContent = "Checking...";
+  out.replaceChildren();
+  try {
+    const res = await fetch("/api/check", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ claim: document.getElementById("claim").value }),
+    });
+    if (!res.ok) throw new Error((await res.json()).detail || "Request failed");
+    const r = await res.json();
+
+    const card = el("div", "", "card");
+    card.append(el("span", r.verdict.replace("_", " "), "badge " + r.verdict));
+    card.append(el("h2", "Explanation"), el("p", r.explanation));
+    card.append(el("h2", "Sources"));
+    if (r.sources.length === 0) {
+      card.append(el("p", "None"));
+    } else {
+      const ul = el("ul");
+      for (const s of r.sources) {
+        const li = el("li"), a = el("a", s.title || s.url);
+        a.href = s.url; a.target = "_blank"; a.rel = "noopener";
+        li.append(a); ul.append(li);
+      }
+      card.append(ul);
+    }
+    out.append(card);
+  } catch (err) {
+    out.append(el("p", err.message, "error"));
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "Check claim";
+  }
+});
+</script>
+</body>
+</html>
