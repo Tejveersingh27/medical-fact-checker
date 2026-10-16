@@ -1,6 +1,6 @@
 # Hantavirus Medical Fact-Checker
 
-A command-line AI agent that fact-checks health claims about hantavirus. It searches **only trusted public-health sources (CDC and WHO)** and then has **GPT-4o-mini** return a structured verdict with an explanation and citations.
+An AI agent that fact-checks health claims about hantavirus. It searches **only trusted public-health sources (CDC and WHO)**, decides for itself what to look up, and returns a verdict, an explanation, and links to the pages it actually used. It runs as a command-line tool or as a small web app.
 
 > ⚠️ This is a learning prototype, not a medical tool. It does not provide medical advice.
 
@@ -8,7 +8,7 @@ A command-line AI agent that fact-checks health claims about hantavirus. It sear
 
 ## Why I built this
 
-Health misinformation spreads quickly, and large language models can "hallucinate" confident answers that aren't true. Instead of letting the model answer from memory, this agent **retrieves real information from the CDC and WHO first** and asks the model to reason only from that evidence. Grounding the answer in trusted sources is the core idea behind retrieval-augmented generation (RAG), and it is what this project is building toward.
+Health misinformation spreads quickly, and large language models can "hallucinate" confident answers that aren't true. Instead of letting the model answer from memory, this agent **retrieves real information from the CDC and WHO first** and only lets the model reason from that evidence. Grounding answers in trusted sources is the core idea behind retrieval-augmented generation (RAG).
 
 ## How it works
 
@@ -16,28 +16,28 @@ Health misinformation spreads quickly, and large language models can "hallucinat
 Claim (user input)
       │
       ▼
-Tavily search ──► restricted to cdc.gov and who.int (advanced depth)
+GPT-4o-mini agent  ◄───────────────┐
+      │                            │
+      ├─ search_trusted_sources ───┘   (up to 3 searches, cdc.gov and who.int only)
       │
-      ▼
-Search results combined into context
-      │
-      ▼
-GPT-4o-mini + system prompt
-      │
-      ▼
-VERDICT (TRUE / FALSE / MISLEADING) · EXPLANATION · SOURCES
+      └─ submit_verdict
+            │
+            ▼
+VERDICT · EXPLANATION · SOURCES
 ```
 
-1. You enter a health claim.
-2. The Tavily API searches only `cdc.gov` and `who.int`.
-3. The text from those results is passed to GPT-4o-mini as context.
-4. A system prompt instructs the model to respond with a verdict, an explanation, and citations.
+1. You enter a claim.
+2. The agent chooses a search query and calls the search tool (Tavily, limited to `cdc.gov` and `who.int`). If the results don't settle the claim, it searches again with a different query. A claim with two parts can get a search for each part.
+3. When it has enough evidence, it submits a verdict: `TRUE`, `FALSE`, `MISLEADING`, or `INSUFFICIENT_EVIDENCE`.
+4. **Citations are real.** Every search result is numbered, the model only says *which numbers* it used, and the code prints the matching titles and URLs. The model never writes a link itself, so it cannot invent one.
+5. Claims that are not about hantavirus, or that the sources don't cover, return `INSUFFICIENT_EVIDENCE` instead of a guess.
 
 ## Tech stack
 
 - **Python**
-- **OpenAI API** (GPT-4o-mini)
+- **OpenAI API** (GPT-4o-mini with tool calling)
 - **Tavily API** (domain-restricted web search)
+- **FastAPI** + a single-page HTML frontend
 - **python-dotenv** (API keys loaded from a local `.env` file, never committed)
 
 ## Getting started
@@ -47,36 +47,55 @@ VERDICT (TRUE / FALSE / MISLEADING) · EXPLANATION · SOURCES
 git clone https://github.com/Tejveersingh27/medical-fact-checker.git
 cd medical-fact-checker
 
-# 2. Install dependencies
-pip install -r requirements.txt
+# 2. Create a virtual environment and install dependencies
+python3 -m venv venv
+venv/bin/pip install -r requirements.txt
 
 # 3. Add your API keys
 cp .env.example .env
 #    then open .env and paste your OpenAI and Tavily keys
-
-# 4. Run it
-python main.py
 ```
 
-## Example
+**Command line**
 
-```
-Enter your claim: Hantavirus spreads easily from person to person.
+```bash
+venv/bin/python main.py
 ```
 
-<!-- TODO: run the command above and paste the real output (or a screenshot) here -->
+**Web app**
+
+```bash
+venv/bin/uvicorn server:app --reload
+# open http://127.0.0.1:8000
+```
+
+The web server limits each visitor to 10 checks per hour and the whole site to 300 per day, so a public deployment cannot run up API costs.
+
+## Testing
+
+`evaluate.py` runs the agent on 26 claims whose correct answers were written by hand from CDC/WHO guidance, including multi-part, half-true, and off-topic claims.
+
+```bash
+venv/bin/python evaluate.py
+```
+
+On the first run the agent got **25 of 26** right. The one miss was an off-topic claim ("Measles spreads through the air") that it judged on the CDC's measles pages instead of declining. The prompt was tightened and that claim now returns `INSUFFICIENT_EVIDENCE`; the full set has not been re-run since that fix.
+
+The test set is small and written by the project author, so this shows the pipeline works, not that it is 96% accurate on real-world claims.
 
 ## Roadmap
 
-| Sprint | Goal | Status |
+| Step | Goal | Status |
 |---|---|---|
-| **1. CLI agent** | Domain-restricted search (CDC/WHO) + GPT-4o-mini verdicts with citations | ✅ Done |
-| **2. API + interface** | Wrap the agent in a **FastAPI** endpoint and build a **React** frontend to submit claims and view results | 🔜 Planned |
-| **3. Better grounding + confidence** | Add a **RAG pipeline** (vector store over CDC/WHO/PubMed documents) and a **logistic regression** model that scores confidence in each verdict | 🔜 Planned |
-| **4. Insights + deployment** | Use **K-means clustering** to group recurring claims, containerize with **Docker**, and add a **GitHub Actions** CI pipeline | 🔜 Planned |
+| **1. CLI agent** | Domain-restricted search (CDC/WHO) + GPT-4o-mini verdicts | ✅ Done |
+| **2. Real citations + tests** | Source links come from search results, structured output, labelled test set | ✅ Done |
+| **3. Agent + web app** | Model chooses its own searches; FastAPI backend and web page; rate limits | ✅ Done |
+| **4. Deployment** | Public demo link (Render) | 🔜 Next |
+| **5. Better evaluation** | Larger test set using real social-media-style claims; compare models | 🔜 Planned |
 
 ## Limitations
 
 - Verdicts depend on what the search returns; if CDC/WHO pages don't cover a claim, the answer will be limited.
-- There is no evaluation set yet to measure accuracy. Building one is part of Sprint 3.
+- The test set is small and hand-labelled.
+- The agent does not learn from past claims; each check starts fresh.
 - Prototype only. Not a substitute for professional medical advice.
