@@ -26,8 +26,8 @@ below doesn't match exactly, look for the closest one.
 | Instance Type | Free |
 | Health Check Path (under Advanced) | `/health` |
 
-The Python version comes from the `.python-version` file in this repo (3.9.6, the
-version the tests were run on). See "If the build fails" below.
+The Python version comes from the `.python-version` file in this repo (3.12.16, the
+same major version the GitHub tests run on). See "If the build fails" below.
 
 ## Step 2: Add the environment variables
 
@@ -91,11 +91,9 @@ delete that one line in `server.py` later if you prefer.
 
 ## If the build fails
 
-- **"Python version not supported" or similar:** Python 3.9 is old, and Render may no
-  longer offer it. Change the number in `.python-version` to a newer one, such as
-  `3.12.x` (Render's build log will list the versions it accepts). **That version has not
-  been tested here**, so run `python -m pytest` on it, or watch the GitHub Actions result,
-  before relying on it.
+- **"Python version not supported" or similar:** Render may not offer that exact patch
+  number yet. Change the number in `.python-version` to one the build log says it accepts
+  (keep it on 3.12 if you can, because that is the version GitHub's tests run on).
 - **A package fails to install:** copy the error from the build log and look at the
   package named in it.
 - **The site shows "The fact-check failed":** open the **Logs**. The error is printed there
