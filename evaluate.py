@@ -5,13 +5,7 @@ Each claim lists the verdicts we accept as correct (some claims are
 reasonably either FALSE or MISLEADING). Labels are based on CDC/WHO guidance.
 """
 
-import os
-
-from dotenv import load_dotenv
-from openai import OpenAI
-from tavily import TavilyClient
-
-from main import check_claim
+from main import check_claim, make_clients
 
 CLAIMS = [
     ("Hantavirus spreads to people through contact with rodent urine, droppings, or saliva.", ["TRUE"]),
@@ -45,9 +39,7 @@ CLAIMS = [
 
 
 def main() -> None:
-    load_dotenv()
-    client = OpenAI()
-    tavily = TavilyClient(api_key=os.getenv("TAVILY_API_KEY"))
+    client, tavily = make_clients()
 
     correct = with_sources = 0
     for claim, expected in CLAIMS:

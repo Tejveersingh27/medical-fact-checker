@@ -5,22 +5,21 @@ Run with:  venv/bin/uvicorn server:app --reload
 Then open http://127.0.0.1:8000
 """
 
+import logging
 import os
 import time
 from collections import defaultdict, deque
 
-from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse
-from openai import OpenAI
 from pydantic import BaseModel, Field
-from tavily import TavilyClient
 
-from main import check_claim
+from main import check_claim, make_clients
 
-load_dotenv()
-client = OpenAI()
-tavily = TavilyClient(api_key=os.getenv("TAVILY_API_KEY"))
+logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+logger = logging.getLogger(__name__)
+
+client, tavily = make_clients()
 
 app = FastAPI(title="Hantavirus Fact-Checker")
 
@@ -90,6 +89,7 @@ def check(req: ClaimRequest, request: Request):
     try:
         return check_claim(client, tavily, req.claim.strip())
     except Exception:
+        logger.exception("Fact-check failed")
         raise HTTPException(status_code=502, detail="The fact-check failed. Please try again.")
 
 

@@ -9,8 +9,9 @@ so every cited link is a page that was actually retrieved.
 """
 
 import json
+import logging
 import os
-from typing import Dict, List
+from typing import Dict, List, Tuple
 
 from dotenv import load_dotenv
 from openai import OpenAI
@@ -21,6 +22,10 @@ MODEL = "gpt-4o-mini"
 VERDICTS = ["TRUE", "FALSE", "MISLEADING", "INSUFFICIENT_EVIDENCE"]
 
 MAX_SEARCHES = 3
+MAX_STEPS = MAX_SEARCHES + 3  # model calls allowed per claim; spare steps cover a malformed reply or two
+REQUEST_TIMEOUT = 20  # seconds to wait on OpenAI or Tavily before giving up
+
+logger = logging.getLogger(__name__)
 
 SYSTEM_PROMPT = (
     "You are a medical fact checker specializing in hantavirus. "
@@ -67,10 +72,20 @@ TOOLS = [
 ]
 
 
+def make_clients() -> Tuple[OpenAI, TavilyClient]:
+    """Load API keys from .env and build the OpenAI and Tavily clients."""
+    load_dotenv()  # loads OPENAI_API_KEY and TAVILY_API_KEY from .env
+    return (
+        OpenAI(timeout=REQUEST_TIMEOUT, max_retries=1),
+        TavilyClient(api_key=os.getenv("TAVILY_API_KEY")),
+    )
+
+
 def search_trusted_sources(tavily: TavilyClient, claim: str) -> List[Dict]:
     """Search CDC and WHO for the claim and return the results (title, url, content)."""
     results = tavily.search(
         query=claim,
+        timeout=REQUEST_TIMEOUT,
         search_depth="basic",  # 1 Tavily credit per search; "advanced" costs 2
         include_domains=TRUSTED_DOMAINS,
     )
@@ -102,7 +117,7 @@ def check_claim(client: OpenAI, tavily: TavilyClient, claim: str) -> Dict:
         {"role": "user", "content": f"Claim: {claim}"},
     ]
 
-    for _ in range(MAX_SEARCHES + 1):
+    for _ in range(MAX_STEPS):
         # Once the search budget is used up, the only thing left to do is answer.
         if searches >= MAX_SEARCHES:
             tool_choice = {"type": "function", "function": {"name": "submit_verdict"}}
@@ -118,9 +133,26 @@ def check_claim(client: OpenAI, tavily: TavilyClient, claim: str) -> Dict:
             parallel_tool_calls=False,
         )
         message = response.choices[0].message
+        if not message.tool_calls:
+            logger.warning("Model replied without calling a tool")
+            return insufficient("The model did not give a usable answer.")
         messages.append(message)
         call = message.tool_calls[0]
-        args = json.loads(call.function.arguments)
+
+        # The model writes the tool arguments as text, so they can be malformed.
+        # Tell it what went wrong and let it try again (MAX_STEPS bounds the retries).
+        try:
+            args = json.loads(call.function.arguments)
+            if not isinstance(args, dict):
+                raise ValueError("arguments must be a JSON object")
+        except ValueError:
+            logger.warning("Malformed arguments for %s: %r", call.function.name, call.function.arguments[:200])
+            messages.append({
+                "role": "tool",
+                "tool_call_id": call.id,
+                "content": "Error: the arguments were not valid JSON. Call the tool again with valid arguments.",
+            })
+            continue
 
         if call.function.name == "submit_verdict":
             if not sources:
@@ -140,7 +172,9 @@ def check_claim(client: OpenAI, tavily: TavilyClient, claim: str) -> Dict:
 
         # Otherwise the model asked to search.
         searches += 1
-        results = search_trusted_sources(tavily, args.get("query") or claim)
+        query = args.get("query") or claim
+        results = search_trusted_sources(tavily, query)
+        logger.info("Search %d/%d %r returned %d results", searches, MAX_SEARCHES, query, len(results))
         text = format_results(results, len(sources) + 1) if results else "No results found."
         sources.extend(results)
         messages.append({"role": "tool", "tool_call_id": call.id, "content": text})
@@ -159,9 +193,8 @@ def print_result(result: Dict) -> None:
 
 
 def main() -> None:
-    load_dotenv()  # loads OPENAI_API_KEY and TAVILY_API_KEY from .env
-    client = OpenAI()
-    tavily = TavilyClient(api_key=os.getenv("TAVILY_API_KEY"))
+    logging.basicConfig(level=logging.WARNING)
+    client, tavily = make_clients()
 
     claim = input("Enter your claim: ")
     print_result(check_claim(client, tavily, claim))
