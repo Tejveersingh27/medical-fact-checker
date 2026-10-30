@@ -74,15 +74,30 @@ When deployed behind a proxy, set the `TRUSTED_PROXY_HOPS` environment variable 
 
 ## Testing
 
-`evaluate.py` runs the agent on 26 claims whose correct answers were written by hand from CDC/WHO guidance, including multi-part, half-true, and off-topic claims.
+`evaluate.py` runs the agent on 32 claims. Each claim has exactly one correct verdict, chosen with this rule from what the CDC and WHO pages say:
+
+| Verdict | Meaning |
+|---|---|
+| `TRUE` | fully supported by CDC/WHO |
+| `FALSE` | the main thing the claim asserts is contradicted |
+| `MISLEADING` | partly true, but leaves out something that leads to the wrong conclusion |
+| `INSUFFICIENT_EVIDENCE` | CDC/WHO pages don't address it, or it isn't about hantavirus |
+
+Claims outside hantavirus (for example measles) are expected to return `INSUFFICIENT_EVIDENCE`. That is a design choice for this tool, not a statement about the facts.
 
 ```bash
 venv/bin/python evaluate.py
 ```
 
-On the first run the agent got **25 of 26** right. The one miss was an off-topic claim ("Measles spreads through the air") that it judged on the CDC's measles pages instead of declining. The prompt was tightened and that claim now returns `INSUFFICIENT_EVIDENCE`; the full set has not been re-run since that fix.
+**Latest full run: 26 of 32 correct (81%).** The six misses:
 
-The test set is small and written by the project author, so this shows the pipeline works, not that it is 96% accurate on real-world claims.
+- **Blood-type claim** (expected `INSUFFICIENT_EVIDENCE`, got `FALSE`). A real weakness: when the sources are silent, the agent says "no evidence supports this" and calls the claim false, instead of saying the sources don't cover it. It did this on 3 of 3 repeat runs.
+- **"Rare, so precautions are unnecessary" and "most survive, so it isn't dangerous"** (expected `MISLEADING`, got `FALSE`). Arguable: the agent judged the conclusion in each claim, which the sources contradict. These labels were written by hand under the rule above, so they may be the weaker side of the disagreement.
+- **Three claims about person-to-person spread or vaccines** (expected `FALSE`, got `MISLEADING`). Also arguable, since each contains a true part (rodents spread the virus; Andes virus can spread between people).
+
+Results move by about a claim between runs even at temperature 0, because the live search results vary (one claim passed in earlier runs and was `MISLEADING` in this one). An earlier version of the test accepted two verdicts for some claims and scored 26 of 26; it was tightened to one verdict per claim, and six new claims, labelled before they were run, were added.
+
+The 32 claims are few and were written by the project's author with an AI assistant, and the labels have not been reviewed by anyone else. Treat the score as a way to find weaknesses, not as an accuracy figure.
 
 ### Unit tests
 
@@ -106,6 +121,6 @@ These tests use fake OpenAI and Tavily clients, so they need no API keys, make n
 ## Limitations
 
 - Verdicts depend on what the search returns; if CDC/WHO pages don't cover a claim, the answer will be limited.
-- The test set is small and hand-labelled.
+- The test set is small, and its labels have not been independently reviewed.
 - The agent does not learn from past claims; each check starts fresh.
 - Prototype only. Not a substitute for professional medical advice.
