@@ -1,5 +1,5 @@
-openai
-tavily-python
-python-dotenv
-fastapi
-uvicorn
+openai==2.37.0
+tavily-python==0.8.5
+python-dotenv==1.2.1
+fastapi==0.128.8
+uvicorn==0.39.0
