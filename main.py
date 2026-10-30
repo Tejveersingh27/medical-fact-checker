@@ -35,6 +35,8 @@ SYSTEM_PROMPT = (
     "When you have enough evidence, call submit_verdict. "
     "Verdicts: TRUE, FALSE, MISLEADING (partly true but missing important context), "
     "or INSUFFICIENT_EVIDENCE (the sources do not cover it). "
+    "Use FALSE only when the sources actively contradict the claim. If the sources simply never mention "
+    "what the claim says, that is INSUFFICIENT_EVIDENCE, not FALSE, even though no evidence was found. "
     "You only judge claims about hantavirus: if the claim is about any other disease or topic, "
     "answer INSUFFICIENT_EVIDENCE with an explanation that this tool only covers hantavirus, even if the sources support the claim. "
     "Never guess. In source_ids, list only the numbers of results that support your explanation."

@@ -93,11 +93,12 @@ Claims outside hantavirus (for example measles) are expected to return `INSUFFIC
 venv/bin/python evaluate.py
 ```
 
-**Latest full run: 26 of 32 correct (81%).** The six misses:
+**Latest full run: 27 of 32 correct (84%).** The five misses:
 
-- **Blood-type claim** (expected `INSUFFICIENT_EVIDENCE`, got `FALSE`). A real weakness: when the sources are silent, the agent says "no evidence supports this" and calls the claim false, instead of saying the sources don't cover it. It did this on 3 of 3 repeat runs.
 - **"Rare, so precautions are unnecessary" and "most survive, so it isn't dangerous"** (expected `MISLEADING`, got `FALSE`). Arguable: the agent judged the conclusion in each claim, which the sources contradict. These labels were written by hand under the rule above, so they may be the weaker side of the disagreement.
 - **Three claims about person-to-person spread or vaccines** (expected `FALSE`, got `MISLEADING`). Also arguable, since each contains a true part (rodents spread the virus; Andes virus can spread between people).
+
+A weakness found by this test and since fixed: when the sources never mentioned a claim (a blood-type claim), the agent answered `FALSE` ("no evidence supports this") instead of `INSUFFICIENT_EVIDENCE`, on 3 of 3 runs. The prompt now says `FALSE` requires the sources to contradict the claim; the claim now returns `INSUFFICIENT_EVIDENCE` on 3 of 3 runs, and no other claim got worse (26/32 to 27/32).
 
 Results move by about a claim between runs even at temperature 0, because the live search results vary (one claim passed in earlier runs and was `MISLEADING` in this one). An earlier version of the test accepted two verdicts for some claims and scored 26 of 26; it was tightened to one verdict per claim, and six new claims, labelled before they were run, were added.
 
