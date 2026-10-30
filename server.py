@@ -58,6 +58,7 @@ def enforce_limits(request: Request) -> None:
     """Raise 429 if this visitor, or the whole site, has used up its checks."""
     now = time.time()
     visitor = client_ip(request)
+    logger.info("Check requested by visitor %s", visitor)  # lets you verify TRUSTED_PROXY_HOPS after deploying
 
     while hits_today and now - hits_today[0] > 86400:
         hits_today.popleft()
@@ -91,6 +92,12 @@ def check(req: ClaimRequest, request: Request):
     except Exception:
         logger.exception("Fact-check failed")
         raise HTTPException(status_code=502, detail="The fact-check failed. Please try again.")
+
+
+@app.get("/health")
+def health():
+    """Used by the host to see that the app is up. Calls no external service and uses no quota."""
+    return {"status": "ok"}
 
 
 @app.get("/")

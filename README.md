@@ -72,6 +72,10 @@ venv/bin/uvicorn server:app --reload
 The web server limits each visitor to 10 checks per hour and the whole site to 25 per day, so a public deployment cannot use up the free API quotas.
 When deployed behind a proxy, set the `TRUSTED_PROXY_HOPS` environment variable to the number of proxies in front of the app (default `0`); otherwise visitors are identified by the connecting IP and the `X-Forwarded-For` header is ignored.
 
+## Deploying
+
+See [DEPLOY.md](DEPLOY.md) for step-by-step instructions to host the web app on Render.
+
 ## Testing
 
 `evaluate.py` runs the agent on 32 claims. Each claim has exactly one correct verdict, chosen with this rule from what the CDC and WHO pages say:
