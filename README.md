@@ -84,6 +84,15 @@ On the first run the agent got **25 of 26** right. The one miss was an off-topic
 
 The test set is small and written by the project author, so this shows the pipeline works, not that it is 96% accurate on real-world claims.
 
+### Unit tests
+
+```bash
+venv/bin/pip install -r requirements-dev.txt
+venv/bin/python -m pytest
+```
+
+These tests use fake OpenAI and Tavily clients, so they need no API keys, make no network calls, and cost nothing. They cover how sources are numbered and cited (including invalid ids from the model), verdict handling, the search budget, malformed model output, and the web server's rate limits. They run automatically on every push through GitHub Actions.
+
 ## Roadmap
 
 | Step | Goal | Status |

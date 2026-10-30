@@ -162,7 +162,7 @@ def check_claim(client: OpenAI, tavily: TavilyClient, claim: str) -> Dict:
                 verdict = "INSUFFICIENT_EVIDENCE"
             cited = []
             for i in args.get("source_ids", []):
-                if isinstance(i, int) and 1 <= i <= len(sources) and sources[i - 1] not in cited:
+                if isinstance(i, int) and not isinstance(i, bool) and 1 <= i <= len(sources) and sources[i - 1] not in cited:
                     cited.append(sources[i - 1])
             return {
                 "verdict": verdict,
