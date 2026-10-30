@@ -71,7 +71,7 @@ def search_trusted_sources(tavily: TavilyClient, claim: str) -> List[Dict]:
     """Search CDC and WHO for the claim and return the results (title, url, content)."""
     results = tavily.search(
         query=claim,
-        search_depth="advanced",
+        search_depth="basic",  # 1 Tavily credit per search; "advanced" costs 2
         include_domains=TRUSTED_DOMAINS,
     )
     return [

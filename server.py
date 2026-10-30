@@ -26,7 +26,7 @@ app = FastAPI(title="Hantavirus Fact-Checker")
 
 # Spending protection (in memory, so it resets when the server restarts).
 PER_VISITOR_LIMIT = 10       # checks per visitor per hour
-DAILY_LIMIT = 300            # checks across all visitors per day
+DAILY_LIMIT = 25             # checks across all visitors per day (Tavily free plan is limited)
 hits_by_visitor = defaultdict(deque)
 hits_today = deque()
 

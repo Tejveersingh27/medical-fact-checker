@@ -69,7 +69,7 @@ venv/bin/uvicorn server:app --reload
 # open http://127.0.0.1:8000
 ```
 
-The web server limits each visitor to 10 checks per hour and the whole site to 300 per day, so a public deployment cannot run up API costs.
+The web server limits each visitor to 10 checks per hour and the whole site to 25 per day, so a public deployment cannot use up the free API quotas.
 
 ## Testing
 
