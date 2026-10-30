@@ -27,21 +27,48 @@ app = FastAPI(title="Hantavirus Fact-Checker")
 # Spending protection (in memory, so it resets when the server restarts).
 PER_VISITOR_LIMIT = 10       # checks per visitor per hour
 DAILY_LIMIT = 25             # checks across all visitors per day (Tavily free plan is limited)
+MAX_TRACKED_VISITORS = 10_000  # safety net so the visitor table cannot grow without bound
+# How many proxies we run in front of this app (0 = none, e.g. local development).
+TRUSTED_PROXY_HOPS = int(os.getenv("TRUSTED_PROXY_HOPS", "0"))
 hits_by_visitor = defaultdict(deque)
 hits_today = deque()
+
+
+def client_ip(request: Request) -> str:
+    """Return the visitor's IP address.
+
+    X-Forwarded-For can be forged by the client, so it is ignored unless we know
+    how many trusted proxies sit in front of us. Each proxy appends the address
+    it saw, so with N trusted proxies the real visitor is the Nth entry from the
+    right; anything to its left was supplied by the client and cannot be trusted.
+    """
+    if TRUSTED_PROXY_HOPS > 0:
+        parts = [p.strip() for p in request.headers.get("x-forwarded-for", "").split(",") if p.strip()]
+        if len(parts) >= TRUSTED_PROXY_HOPS:
+            return parts[-TRUSTED_PROXY_HOPS]
+    return request.client.host if request.client else "unknown"
+
+
+def prune_visitors(now: float) -> None:
+    """Forget visitors who have made no check in the last hour."""
+    for ip in [ip for ip, hits in hits_by_visitor.items() if not hits or now - hits[-1] > 3600]:
+        del hits_by_visitor[ip]
 
 
 def enforce_limits(request: Request) -> None:
     """Raise 429 if this visitor, or the whole site, has used up its checks."""
     now = time.time()
-    # Behind a proxy (e.g. Render) the real visitor IP is in X-Forwarded-For.
-    forwarded = request.headers.get("x-forwarded-for")
-    visitor = forwarded.split(",")[0].strip() if forwarded else request.client.host
+    visitor = client_ip(request)
 
     while hits_today and now - hits_today[0] > 86400:
         hits_today.popleft()
     if len(hits_today) >= DAILY_LIMIT:
         raise HTTPException(status_code=429, detail="Daily limit reached. Please try again tomorrow.")
+
+    if visitor not in hits_by_visitor and len(hits_by_visitor) >= MAX_TRACKED_VISITORS:
+        prune_visitors(now)
+        if len(hits_by_visitor) >= MAX_TRACKED_VISITORS:
+            raise HTTPException(status_code=429, detail="The service is busy. Please try again later.")
 
     mine = hits_by_visitor[visitor]
     while mine and now - mine[0] > 3600:

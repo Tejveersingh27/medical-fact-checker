@@ -70,6 +70,7 @@ venv/bin/uvicorn server:app --reload
 ```
 
 The web server limits each visitor to 10 checks per hour and the whole site to 25 per day, so a public deployment cannot use up the free API quotas.
+When deployed behind a proxy, set the `TRUSTED_PROXY_HOPS` environment variable to the number of proxies in front of the app (default `0`); otherwise visitors are identified by the connecting IP and the `X-Forwarded-For` header is ignored.
 
 ## Testing
 
